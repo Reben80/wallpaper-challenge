@@ -150,6 +150,8 @@ button{font:inherit;color:var(--ink);cursor:pointer;border:none;border-radius:12
       <div class="seg" id="segDiff"><button data-v="1" class="on">1</button><button data-v="2">2</button><button data-v="3">3</button></div></div>
     <div class="row"><label class="lab">After a correct answer</label>
       <div class="seg" id="segTurn"><button data-v="pass" class="on">Next team</button><button data-v="keep">Same team</button></div></div>
+    <div class="row"><label class="lab">Last question worth</label>
+      <div class="seg" id="segFinal"><button data-v="1" class="on">1 pt</button><button data-v="2">2 pts</button><button data-v="3">3 pts</button></div></div>
     <div class="row"><label class="lab">Timer per turn</label>
       <div class="seg" id="segTimer"><button data-v="0" class="on">Off</button><button data-v="30">30 s</button><button data-v="45">45 s</button><button data-v="60">60 s</button></div></div>
     <button class="go" id="startBtn">Start</button>
@@ -261,7 +263,7 @@ function reach(g,ans){ const s=walk(ans); if(s.g) return s.g===g;
 /* ---------- state ---------- */
 const COLORS=["var(--t0)","var(--t1)","var(--t2)","var(--t3)"];
 const DEFAULT_NAMES=["Red Team","Blue Team","Green Team","Purple Team"];
-let cfg={practice:1,teams:2,rounds:4,diff:1,turn:"pass",timer:0};
+let cfg={final:1,practice:1,teams:2,rounds:4,diff:1,turn:"pass",timer:0};
 let names=[...DEFAULT_NAMES];
 let S=null, history=[];
 let flash=null, hintOn=false;
@@ -272,7 +274,7 @@ function seg(id,key,cb){const el=document.getElementById(id);
 function renderNames(){const box=document.getElementById("teamNames");box.innerHTML="";
   for(let i=0;i<cfg.teams;i++){const inp=document.createElement("input");inp.value=names[i];inp.style.borderColor=COLORS[i];
     inp.oninput=()=>names[i]=inp.value||DEFAULT_NAMES[i];box.appendChild(inp);}}
-seg("segTeams","teams",renderNames);seg("segRounds","rounds");seg("segDiff","diff");seg("segTurn","turn");seg("segTimer","timer");seg("segPractice","practice");
+seg("segTeams","teams",renderNames);seg("segRounds","rounds");seg("segDiff","diff");seg("segTurn","turn");seg("segTimer","timer");seg("segPractice","practice");seg("segFinal","final");
 renderNames();
 
 function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
@@ -346,8 +348,8 @@ function advance(right, solverTeam){
   S.ans.push(right); S.tried=[]; S.wrongPick=null; S.wrongPicks=[]; S.mode="answer";
   const step=walk(S.ans);
   if(step.g){
-    if(solverTeam!==null && !cur().practice){ S.teams[solverTeam].pts+=2; S.teams[solverTeam].solved.push(step.g); }
-    S.lastSolver=solverTeam; S.phase="reveal"; stopTimer(); renderReveal(); return;
+    if(solverTeam!==null && !cur().practice){ S.teams[solverTeam].pts+=cfg.final-1; S.teams[solverTeam].solved.push(step.g); }
+    S.lastSolver=solverTeam; S.lastAnswerer=S.turn; S.phase="reveal"; stopTimer(); renderReveal(); return;
   }
   // who answers next
   if(solverTeam!==null){ S.turn = cfg.turn==="keep" ? solverTeam : nextTeam(solverTeam); }
@@ -357,14 +359,14 @@ function advance(right, solverTeam){
 function label(v){return {yes:"Yes",no:"No","0":"No rotation","60":"60°","90":"90°","120":"120°","180":"180°"}[v]||v;}
 
 function skipReveal(){
-  snapshot(); S.lastSolver=null;
+  snapshot(); S.lastSolver=null; S.lastAnswerer=(S.turn-1+S.teams.length)%S.teams.length;
   S.ans=[]; let a=[]; while(!walk(a).g){a.push(truth(cur().g,a));} S.ans=a;
   S.phase="reveal"; stopTimer(); renderReveal();
 }
 function nextRound(){
   snapshot();
   document.getElementById("revealOv").classList.remove("on");
-  if(!cur().practice) S.starter=nextTeam(S.starter); S.round++;
+  S.starter = cur().practice ? 0 : nextTeam(S.lastAnswerer ?? S.starter); S.round++;
   if(S.round>=S.deck.length){ finish(); return; }
   loadRound();
 }
@@ -422,7 +424,7 @@ function renderReveal(){
   document.getElementById("reveal").innerHTML=`
     <div class="big">${g}</div>
     <div class="src" style="font-size:17px;margin-top:8px">${p.src}</div>
-    ${p.practice?`<div class="who" style="background:#5d6577">End of practice</div>`:s!==null?`<div class="who" style="background:${S.teams[s].color}">${esc(S.teams[s].name)} +2</div>`:``}
+    ${p.practice?`<div class="who" style="background:#5d6577">End of practice</div>`:s!==null?`<div class="who" style="background:${S.teams[s].color}">${esc(S.teams[s].name)} +${cfg.final}</div>`:``}
     <button class="go" id="nextBtn">${S.round+1<S.deck.length?(p.practice?"Start":"Next"):"Results"}</button>
     <div style="margin-top:12px"><button class="tool" id="undoRev">↶ Undo</button></div>`;
   document.getElementById("revealOv").classList.add("on");
